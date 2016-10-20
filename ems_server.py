@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
 import socket
+import SocketServer
 import sys
 import fcntl
 import struct
+
+ipport = 15435
 
 # Determine IP
 def get_ip_address(ifname):
@@ -14,7 +17,32 @@ def get_ip_address(ifname):
         struct.pack('256s', ifname[:15])
     )[20:24])
 
-ip = get_ip_address('eth0')
+class MyTCPHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        # self.request is the TCP socket connected to the client
+        self.data = self.request.recv(1024).strip()
+        print "Received from {}: ".format(self.client_address[0])+self.data
+        # just send back the same data, but upper-cased
+        self.request.sendall(self.data.upper())
+
+
+if __name__ == "__main__":
+    ip = get_ip_address('eth0')
+    server_address=(ip,ipport)
+    # Create the server, binding to localhost on port 9999
+    server = SocketServer.TCPServer((ip, ipport), MyTCPHandler)
+
+    print >>sys.stderr, 'starting up on %s port %s' % server_address
+
+    server.serve_forever()
+
+
+
+
+
+
+
+
 
 try:
     #create an AF_INET, STREAM socket (TCP)
@@ -38,9 +66,11 @@ while True:
     print >>sys.stderr, 'waiting for a connection...'
     connection, client_address = sock.accept()
     try:
-        print >>sys.stderr, 'client connected:', client_address
+        print >>sys.stderr, 'client connected:', client_addressi
         while True:
             data = connection.recv(16)
+            
+
             print >>sys.stderr, 'received "%s"' % data
             if data:
                 connection.sendall(data)
