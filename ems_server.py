@@ -3,7 +3,6 @@
 import sys, os, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb
 
 tcpport = 15435
-deviceid = 'EMS.d1data'
 
 # Open Database
 
@@ -15,6 +14,8 @@ def signal_handler(signal, frame):
         print('Exiting.')
 	cur.close()
 	db.close()
+#        server.shutdown()
+#        server.server_close()
         sys.exit(0)
 
 
@@ -31,14 +32,37 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1024).strip()
-        print "Received from {}: ".format(self.client_address[0])+self.data
         now = datetime.datetime.now()
-
-        try:
-             cur.execute("""INSERT INTO %s(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(deviceid,now,temp,humi,lux,co2,pres))
-             db.commit()
-        except:
-             db.rollback()
+        sdata = [x for x in self.data.split("#")]
+	print "Received from "+format(self.client_address[0])+" (Device "+sdata[0]+"): "+self.data
+        if sdata[0] == '1':
+         try:
+          cur.execute("""INSERT INTO EMS.d1data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+          db.commit()
+         except:
+          print "Database Error."        
+          db.rollback()
+        elif sdata[0] == '2':
+         try:
+          cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+          db.commit()
+         except:
+          print "Database Error."
+          db.rollback()
+        elif sdata[0] == '3':
+         try:
+          cur.execute("""INSERT INTO EMS.d3data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+          db.commit()
+         except:
+          print "Database Error."
+          db.rollback()
+        elif sdata[0] == '4':
+         try:
+          cur.execute("""INSERT INTO EMS.d4data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+          db.commit()
+         except:
+          print "Database Error."
+          db.rollback()
 
 	# just send back the same data, but upper-cased
         self.request.sendall(self.data.upper())
@@ -54,4 +78,5 @@ if __name__ == "__main__":
     print >>sys.stderr, 'starting up on %s port %s' % server_address
 
     server.serve_forever()
-
+    server.shutdown()
+    server.server_close()

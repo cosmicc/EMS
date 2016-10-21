@@ -1,13 +1,15 @@
 cd /opt
 git clone https://github.com/cosmicc/EMS.git
 apt update
-apt install python python-pip mysql-server python-dev libmysqlclient-dev mysql-client ntp ntpdate -f
+apt install python python-pip mysql-server python-dev libmysqlclient-dev mysql-client ntp ntpdate rrdtool python-rrdtool lighttpd -f
 pip install --upgrade pip
-pip install MySQL-python
+pip install MySQL-python 
 apt-get autoremove
 service mysql restart
 cp /opt/EMS/setup/ntp.conf /etc/ntp.conf
 service ntp restart
+rm /var/www/html/* -f
+cp /opt/EMS/setup/index.html /var/www/html/index.html
 mysql_secure_installation
 mysql -u root --password=EMS16 -e 'CREATE DATABASE EMS;'
 mysql -u root --password=EMS16 EMS < /opt/EMS/setup/dbinit.sql
