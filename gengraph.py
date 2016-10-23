@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, signal, MySQLdb, rrdtool
-
+import sys, os, os.path, signal, MySQLdb, rrdtool
 
 # Open Database
 db = MySQLdb.connect(host = "localhost", user = "root", passwd = "EMS16", db = "EMS")
@@ -16,6 +15,17 @@ def signal_handler(signal, frame):
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
-    cur.execute('select timestamp, temp from d1data');
-    rows = cur.fetchall()
-    
+
+    period = '10m'
+    rrdtool.graph( "/var/www/html/d1temp.jpg", "--start", "-%s" %(period),
+     "--full-size-mode",
+     "--alt-autoscale",
+     "--width=700 --height=400",
+     "--vertical-label", "Temperature (C)",
+     "--slope-mode",
+     "--color=SHADEB#9999CC",
+     "--watermark='Device 1 Temperature'",
+     "DEF:temp=/opt/rrddata/d1temp.rrd:temp:MAX",
+     "LINE2:temp#00FF00:'Temp'",
+     "HRULE:25#FF0000:'Low Limit'")
+

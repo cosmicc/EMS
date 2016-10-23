@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb
+import sys, os, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool
 
 tcpport = 15435
 
@@ -42,6 +42,10 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
          except:
           print "Database Error."        
           db.rollback()
+         ret = rrdtool.update('/opt/rrddata/d1temp.rrd', 'N:%s' %(sdata[1]))
+         if ret:
+          print rrdtool.error()
+ 
         elif sdata[0] == '2':
          try:
           cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
@@ -70,6 +74,18 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
+    if not os.path.isfile('/opt/rrddata/d1temp.rrd'):
+     rrdtool.create(
+      "/opt/rrddata/d1temp.rrd",
+      "--start", "now",
+      "--step", "300",
+      "DS:temp:GAUGE:600:0:38",
+      "RRA:AVERAGE:0.5:1:12", 
+      "RRA:AVERAGE:0.5:1:288", 
+      "RRA:AVERAGE:0.5:12:168", 
+      "RRA:AVERAGE:0.5:12:720", 
+      "RRA:AVERAGE:0.5:288:365")
+
     ip = get_ip_address('eth0')
     server_address=(ip,tcpport)
     # Create the server, binding to localhost on port 9999
