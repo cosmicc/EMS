@@ -1,12 +1,13 @@
 [Unit]
 Description=EMS Server Service
-After=network.target
+After=network.target mysql.service
 
 [Service]
 User=root
 Restart=always
-Type=forking
+Type=simple
 ExecStart=/opt/EMS/ems_server.py -d
 
 [Install]
-WantedBy=multi-user.targe
+WantedBy=multi-user.target
+Alias=ems_server

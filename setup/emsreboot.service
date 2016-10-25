@@ -1,0 +1,12 @@
+[Unit]
+Description=EMS Reboot Script
+DefaultDependencies=no
+Before=reboot.target
+
+[Service]
+ExecStop=/opt/EMS/emsreboot.py
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,11 +1,12 @@
 #!/usr/bin/python
 
-import sys, os, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool, daemon, smbus, argparse
+import sys, os, os.path, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool, daemon, smbus, argparse
 
 version = "v0.1"
 eth = 'wlan0'
 tcpport = 15435
 address = 0x75
+pidfile = '/var/lock/ems_server'
 
 parser = argparse.ArgumentParser(description='Environmental Managmeant System Server Application')
 #parser.add_argument('integers', metavar='N', type=int, nargs='+',
@@ -15,24 +16,39 @@ parser.add_argument('--version', action='version', version='Environmental Managm
 
 args = parser.parse_args()
 
-bus = smbus.SMBus(1)
-db = MySQLdb.connect(host = "localhost", user = "root", passwd = "EMS16", db = "EMS")
-cur = db.cursor()
-
 def main_program():
  if args.d == True:
   sys.stdout = open('/var/log/ems_server.log', 'w')
   sys.stderr = open('/var/log/ems_server.log', 'w')
-  db = MySQLdb.connect(host = "localhost", user = "root", passwd = "EMS16", db = "EMS")
-  cur = db.cursor()
+
+ if os.path.isfile(pidfile):
+  pidf = open(pidfile, "r")
+  pid = pidf.read()
+  pidf.close()
+  print "EMS Server already running pid "+str(pid)+". Exiting."
+  sys.exit()
+ else:
+  pid = os.getpid()
+  pidf = open(pidfile, "w")
+  print "Locking process pid "+str(pid)
+  pidf.write(str(pid))
+  pidf.close()
+
+ db = MySQLdb.connect(host = "localhost", user = "root", passwd = "EMS16", db = "EMS")
+ cur = db.cursor()
  bus = smbus.SMBus(1)
  
 # SIGINT Catch
  def signal_handler(signal, frame):
   pilink("22+")
   pilink("199+")
+  print "SIGNINT Exiting."
   cur.close()
-  db.close()
+  if db.open:
+   db.close()
+  if os.path.isfile(pidfile):
+   print "Removing proccess lock."
+   os.remove(pidfile)
   sys.exit(0)
 
  def pilink(value1):
@@ -75,7 +91,7 @@ def main_program():
          elif sdata[0] == '2':
           try:
            cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
-          #db.commit()
+           db.commit()
           except:
            print "Database Error."
            db.rollback()
@@ -117,6 +133,7 @@ def main_program():
   server = SocketServer.TCPServer((ip, tcpport), MyTCPHandler)
   pilink("100EMS Server "+version+"+") 
   pilink("101"+ip+"+")
+  time.sleep(10)
   print "Starting up on "+eth+" "+ip+":"+str(tcpport)
   pilink("23+")
   server.serve_forever()
@@ -125,15 +142,23 @@ def main_program():
   pilink("199+")
   pilink("22+")
   cur.close()
-  db.close()
+  if db.open:
+   db.close()
+  if os.path.isfile(pidfile):
+   print "Removing proccess lock."
+   os.remove(pidfile)
   sys.exit(0)
   raise
  finally:
-  print('End of Script Exiting.')
+  print('Exiting.')
   pilink("199+")
   pilink("22+")
   cur.close()
-  db.close()
+  if db.open:
+   db.close()
+  if os.path.isfile(pidfile):
+   print "Removing proccess lock."
+   os.remove(pidfile)
   sys.exit(0)
 
 def daemon_run():

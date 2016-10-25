@@ -1,0 +1,13 @@
+[Unit]
+Description=EMS Statusbar Service
+After=ems_server.service
+
+[Service]
+User=root
+Restart=always
+Type=simple
+ExecStart=/opt/EMS/statusbar.py -d
+
+[Install]
+WantedBy=ems_server.service
+Alias=statusbar
