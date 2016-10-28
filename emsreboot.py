@@ -23,5 +23,6 @@ subprocess.Popen('service ems_server stop', shell=True)
 time.sleep(1)
 sendval(99,"399+")
 sendval(99,"199+")
+time.sleep(1)
 sendval(99,"101Rebooting...+")
 

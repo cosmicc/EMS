@@ -1,12 +1,20 @@
 #!/usr/bin/python
 
 import sys, os, os.path, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool, daemon, smbus, argparse
+from config import Config
 
-version = "v0.1"
-eth = 'wlan0'
-tcpport = 15435
-address = 0x75
 pidfile = '/var/lock/ems_server'
+
+try:
+ cfg = Config('/opt/EMS/ems.conf')
+except:
+ print "No config file found. Exiting."
+ sys.exit()
+
+version = cfg.version
+eth = cfg.eth
+tcpport = int(cfg.tcpport)
+address = int(cfg.address, 16)
 
 parser = argparse.ArgumentParser(description='Environmental Managmeant System Server Application')
 #parser.add_argument('integers', metavar='N', type=int, nargs='+',
@@ -41,7 +49,6 @@ def main_program():
 # SIGINT Catch
  def signal_handler(signal, frame):
   pilink("22+")
-  pilink("199+")
   print "SIGNINT Exiting."
   cur.close()
   if db.open:
@@ -57,7 +64,10 @@ def main_program():
   cbdata=[bdata[0]]
   for ibdata in range (1, len(bdata)):
     cbdata=cbdata+[bdata[ibdata]]
-  bus.write_block_data(address, 99, cbdata)
+  try:
+   bus.write_block_data(address, 99, cbdata)
+  except:
+   print "Error communicating with i2c interface."
   return -1
 
 # Determine IP
@@ -72,7 +82,7 @@ def main_program():
  class MyTCPHandler(SocketServer.BaseRequestHandler):
      def handle(self):
          # self.request is the TCP socket connected to the client
-         self.data = self.request.recv(1024).strip()
+         self.data = self.request.recv(50).strip()
          now = datetime.datetime.now()
          sdata = [x for x in self.data.split("#")]
          pilink("499+")
@@ -131,7 +141,8 @@ def main_program():
   server_address=(ip,tcpport)
   # Create the server, binding to localhost on port 9999
   server = SocketServer.TCPServer((ip, tcpport), MyTCPHandler)
-  pilink("100EMS Server "+version+"+") 
+  if not os.path.isfile('/run/lock/statusbar'):
+   pilink("100EMS Server "+version+"+") 
   pilink("101"+ip+"+")
   time.sleep(10)
   print "Starting up on "+eth+" "+ip+":"+str(tcpport)
@@ -139,7 +150,6 @@ def main_program():
   server.serve_forever()
  except KeyboardInterrupt:
   print('CTRL-C Exiting.')
-  pilink("199+")
   pilink("22+")
   cur.close()
   if db.open:
@@ -151,7 +161,6 @@ def main_program():
   raise
  finally:
   print('Exiting.')
-  pilink("199+")
   pilink("22+")
   cur.close()
   if db.open:

@@ -1,11 +1,21 @@
 #!/usr/bin/python
 
 import sys, os, os.path, math, signal, socket, fcntl, struct, time, datetime, MySQLdb, daemon, smbus, psutil, argparse, RPi.GPIO as GPIO
+from config import Config
 
-address = 0x75
-eth = 'wlan0'
+try:
+ cfg = Config('/opt/EMS/ems.conf')
+except:
+ print "No config file found. Exiting."
+ sys.exit()
+
+version = cfg.version
+eth = cfg.eth
+address = int(cfg.address, 16)
+loopdelay = cfg.loopdelay
+startupdelay = cfg.startupdelay
+
 pidfile = '/var/lock/statusbar'
-delay = 5
 
 parser = argparse.ArgumentParser(description='Environmental Managmeant System Statusbar Application')
 parser.add_argument('-d', action='store_true', default=False, help='Run as Daemon')
@@ -30,7 +40,9 @@ def main_program():
   print "Locking process pid "+str(pid)
   pidf.write(str(pid))
   pidf.close()
-
+ 
+ pilink("100S1  S2  S3  S4+")
+ 
 # SIGINT Catch
  def signal_handler(signal, frame):
   pilink("22+")
@@ -41,7 +53,7 @@ def main_program():
    os.remove(pidfile)
   sys.exit(0)
 
- time.sleep(3)
+ time.sleep(startupdelay)
  bus = smbus.SMBus(1)
  GPIO.setmode(GPIO.BCM)
  GPIO.setup(23, GPIO.IN, pull_up_down = GPIO.PUD_UP)
@@ -53,10 +65,11 @@ def main_program():
   cbdata=[bdata[0]]
   for ibdata in range (1, len(bdata)):
     cbdata=cbdata+[bdata[ibdata]]
-  bus.write_block_data(address, 99, cbdata)
+  try:
+   bus.write_block_data(address, 99, cbdata)
+  except:
+   print "Error communicating with i2c interface."
   return -1
-
- pilink("100S1  S2  S3  S4  +")
 
  def rstButton(channel):
   print("Reset Button pressed!")
@@ -173,30 +186,35 @@ def main_program():
    pilink("22+") 
   mylist = [lastd1, lastd2, lastd3, lastd4]
   latest = max(mylist)
-  seconds = (now - latest[0]).seconds
-  minutes = seconds / 60
-  hours = seconds / 3600
-  days = seconds / 86400
-  if (hours > 24):
-   hours = hours-days*24
-   last = str(days)+" Days "+str(hours)+" Hrs"
-  elif (minutes > 60):
-   minutes = minutes-hours*60
-   last = str(hours)+" Hrs "+str(minutes)+" Min"
-  elif (seconds > 60):
-   seconds = seconds-(minutes*60)
-   last = str(minutes)+" Min "+str(seconds)+" Sec"
-  else:
-   last = str(seconds)+" Seconds ago"
-  cur.close()
-  db.close()
-  return last
+  try:
+   seconds = (now - latest[0]).seconds
+   minutes = seconds / 60
+   hours = seconds / 3600
+   days = seconds / 86400
+   if (hours > 24):
+    hours = hours-days*24
+    last = str(days)+" Days "+str(hours)+" Hrs"
+   elif (minutes > 60):
+    minutes = minutes-hours*60
+    last = str(hours)+" Hrs "+str(minutes)+" Min"
+   elif (seconds > 60):
+    seconds = seconds-(minutes*60)
+    last = str(minutes)+" Min "+str(seconds)+" Sec"
+   else:
+    last = str(seconds)+" Seconds ago"
+   cur.close()
+   db.close()
+   return last
+  except:
+   print "No Data."
  
  try: 
   while True:
-   #start = time.time() 
+   if args.d == False:
+    start = time.time() 
    checklast()
-   print "LCD Sreen State: #"+str(lcdstate)
+   if args.d == False:
+    print "LCD Sreen State: #"+str(lcdstate)
    if (lcdstate == 1):
     showip()
    elif (lcdstate == 2):
@@ -205,11 +223,12 @@ def main_program():
     showrss()
    elif (lcdstate == 0):
     showlast()
-   #end = time.time()
-   #extime = (end - start)
-   #millis = int(round(extime * 1000))
-   #print "Execution Time: "+str(millis)+"ms"
-   time.sleep(delay)
+   if args.d == False:
+    end = time.time()
+    extime = (end - start)
+    millis = int(round(extime * 1000))
+    print "Execution Time: "+str(millis)+"ms"
+   time.sleep(loopdelay)
  except KeyboardInterrupt:
   print('CTRL-C Exiting.')
   if os.path.isfile(pidfile):
