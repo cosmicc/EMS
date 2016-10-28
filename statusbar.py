@@ -41,8 +41,6 @@ def main_program():
   pidf.write(str(pid))
   pidf.close()
  
- pilink("100S1  S2  S3  S4+")
- 
 # SIGINT Catch
  def signal_handler(signal, frame):
   pilink("22+")
@@ -73,6 +71,8 @@ def main_program():
 
  def rstButton(channel):
   print("Reset Button pressed!")
+
+ pilink("100S1  S2  S3  S4+")
 
  GPIO.add_event_detect(24, GPIO.RISING, callback=rstButton, bouncetime=2000)
  global lcdstate

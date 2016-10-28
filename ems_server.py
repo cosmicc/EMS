@@ -82,17 +82,24 @@ def main_program():
  class MyTCPHandler(SocketServer.BaseRequestHandler):
      def handle(self):
          # self.request is the TCP socket connected to the client
-         self.data = self.request.recv(50).strip()
+         self.data = self.request.recv(1024).strip()
          now = datetime.datetime.now()
          sdata = [x for x in self.data.split("#")]
+         print sdata;
          pilink("499+")
          print "Received from "+format(self.client_address[0])+" (Device "+sdata[0]+"): "+self.data
          if sdata[0] == '1':
           try:
-           cur.execute("""INSERT INTO EMS.d1data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+           cur.execute("""INSERT INTO EMS.d1data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
            db.commit()
-          except:
-           print "Database Error."
+          #except:
+          except MySQLdb.Error, e:
+           try:
+            print "MySQL Error [%d]: %s" % (e.args[0], e.args[1])
+           except IndexError:
+            print "MySQL Error: %s" % str(e)
+
+           #print "Database Error."
            db.rollback()
           ret = rrdtool.update('/opt/rrddata/d1temp.rrd', 'N:%s' %(sdata[1]))
           if ret:
@@ -100,21 +107,21 @@ def main_program():
 
          elif sdata[0] == '2':
           try:
-           cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+           cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
            db.commit()
           except:
            print "Database Error."
            db.rollback()
          elif sdata[0] == '3':
           try:
-           cur.execute("""INSERT INTO EMS.d3data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+           cur.execute("""INSERT INTO EMS.d3data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
            db.commit()
           except:
            print "Database Error."
            db.rollback()
          elif sdata[0] == '4':
           try:
-           cur.execute("""INSERT INTO EMS.d4data(timestamp,temp,humidity,lux,co2,pressure) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5]))
+           cur.execute("""INSERT INTO EMS.d4data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
            db.commit()
           except:
            print "Database Error."
@@ -141,8 +148,7 @@ def main_program():
   server_address=(ip,tcpport)
   # Create the server, binding to localhost on port 9999
   server = SocketServer.TCPServer((ip, tcpport), MyTCPHandler)
-  if not os.path.isfile('/run/lock/statusbar'):
-   pilink("100EMS Server "+version+"+") 
+  pilink("100EMS Server "+version+"+") 
   pilink("101"+ip+"+")
   time.sleep(10)
   print "Starting up on "+eth+" "+ip+":"+str(tcpport)
