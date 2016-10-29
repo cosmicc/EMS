@@ -3,7 +3,9 @@ Description=EMS Shutdown Script
 DefaultDependencies=no
 Before=shutdown.target halt.target
 
-
 [Service]
 ExecStart=/opt/EMS/emsshutdown.py
 Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
