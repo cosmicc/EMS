@@ -18,11 +18,7 @@ def sendval(value1, value2):
  bus.write_block_data(address, value1, cbdata)
  return -1
 
-subprocess.Popen('service statusbar stop', shell=True)
-subprocess.Popen('service ems_server stop', shell=True)
-time.sleep(1)
-sendval(99,"399+")
-sendval(99,"199+")
-time.sleep(1)
-sendval(99,"101Rebooting...+")
+subprocess.call("service statusbar stop")
+subprocess.call("service ems_server stop")
 
+sendval(99,"499+")

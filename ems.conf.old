@@ -1,0 +1,7 @@
+version: 'v1.0'   # EMS version
+eth: 'wlan0'      # AP Device
+mon: 'wlan1'      # Intenet Device
+tcpport: 15435    # EMS Server TCP Listen Port
+address: '0x75'   # I2C Address of Arduino
+loopdelay: 5      # Delay in statusbar loop
+startupdelay: 10  # Statusbar script startup delay

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, os.path, math, signal, socket, fcntl, struct, time, datetime, MySQLdb, daemon, smbus, psutil, argparse, RPi.GPIO as GPIO
+import sys, os, os.path, math, signal, socket, fcntl, struct, time, datetime, MySQLdb, daemon, smbus, psutil, argparse, subprocess, RPi.GPIO as GPIO
 from config import Config
 
 try:
@@ -10,7 +10,7 @@ except:
  sys.exit()
 
 version = cfg.version
-eth = cfg.eth
+eth = cfg.mon
 address = int(cfg.address, 16)
 loopdelay = cfg.loopdelay
 startupdelay = cfg.startupdelay
@@ -27,7 +27,7 @@ def main_program():
  if args.d == True:
   sys.stdout = open('/var/log/statusbar.log', 'w')
   sys.stderr = open('/var/log/statusbar.log', 'w')
-
+ 
  if os.path.isfile(pidfile):
   pidf = open(pidfile, "r")
   pid = pidf.read()
@@ -43,8 +43,8 @@ def main_program():
  
 # SIGINT Catch
  def signal_handler(signal, frame):
-  pilink("22+")
-  pilink("199+")
+  pilink("11red+")
+  pilink("399+")
   print "SIGNINT Exiting."
   if os.path.isfile(pidfile):
    print "Removing proccess lock."
@@ -72,23 +72,43 @@ def main_program():
  def rstButton(channel):
   print("Reset Button pressed!")
 
- pilink("100S1  S2  S3  S4+")
+ pilink("300S1  S2  S3  S4  +")
 
  GPIO.add_event_detect(24, GPIO.RISING, callback=rstButton, bouncetime=2000)
  global lcdstate
  lcdstate = 1
 
+ def run_command(command):
+  p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  return iter(p.stdout.readline, b'')
+  p.kill()
+
+ def activestations():
+  sta = []
+  command = '/opt/EMS/allstations.sh'.split()
+  for line in run_command(command):
+   junk,inst=line.split("=")
+   inst=inst.rstrip('\n')
+   sta.append(inst)
+  #p.kill()
+  if len(sta) == 0:
+   pilink("3010 Wifi Connected+")
+   pilink("11green+")
+  else:
+   pilink("301"+str(len(sta))+" Wifi Connected+")
+   pilink("10green+")
+  #return len(sta)
+
  def showip():
   s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   ip = socket.inet_ntoa(fcntl.ioctl(s.fileno(),0x8915, struct.pack('256s', eth[:15]))[20:24])
-  #print "101"+ip+"+"
-  pilink("101"+ip+"+")
+  pilink("301"+ip+"+")
 
  def showtime():
   now = datetime.datetime.now()
   nowstr = str(now.month)+"-"+str(now.day)+"-"+str(now.year)+" "+str(now.hour)+":"+str(now.minute)
   #print nowstr
-  pilink("101"+nowstr+"+")
+  pilink("301"+nowstr+"+")
 
  def showrss():
   cpu=psutil.cpu_percent(interval=1)
@@ -98,33 +118,35 @@ def main_program():
   memd = int(round(mem.percent,0))
   dskd = int(round(disk.percent,0))
   #print ("101C"+str(cpud)+"% M"+str(memd)+"% D"+str(dskd)+"%+")
-  pilink("101C"+str(cpud)+"% M"+str(memd)+"% D"+str(dskd)+"%+")
+  pilink("301C"+str(cpud)+"% M"+str(memd)+"% D"+str(dskd)+"%+")
 
  def showlast():
   last = checklast()
   #print ("101"+str(last)+"+")
-  pilink("101"+str(last)+"+")
+  pilink("301"+str(last)+"+")
  
  def lcdButton(channel):
-  #print("LCD Button pressed")
-  time.sleep(0.25)
+  global ispushed
+  ispushed=True
+  if args.d == False:
+   print("LCD Button pressed")
   global lcdstate
+  if (lcdstate == 5):
+   lcdstate = 0
   lcdstate=lcdstate+1
   if (lcdstate == 1):
-   showip()
-   time.sleep(1)
+   activestations()
   elif (lcdstate == 2):
-   showtime()
-   time.sleep(1)
+   showlast()
   elif (lcdstate == 3):
    showrss()
-   time.sleep(2)
   elif (lcdstate == 4):
-   showlast()
-   lcdstate = 0
-   time.sleep(1)
+   showtime()
+  elif (lcdstate == 5):
+   showip()
+  ispushed=False
 
- GPIO.add_event_detect(23, GPIO.RISING, callback=lcdButton, bouncetime=2000)
+ GPIO.add_event_detect(23, GPIO.RISING, callback=lcdButton, bouncetime=1000)
 
  def checklast(): 
   db = MySQLdb.connect(host = "localhost", user = "root", passwd = "EMS16", db = "EMS")
@@ -133,6 +155,7 @@ def main_program():
   lastd2 = 0
   lastd3 = 0
   lastd4 = 0
+  lastcount = 0
   now = datetime.datetime.now()
   cur.execute("SELECT timestamp FROM d1data ORDER BY timestamp DESC LIMIT 1")
   tstamp = cur.fetchone()
@@ -140,50 +163,65 @@ def main_program():
    lastd1 = tstamp   
    if (now - tstamp[0]) < datetime.timedelta(0,180):
     pilink("511+")
+    pilink("20green+")
    else:
     pilink("510+")
+    lastcount = lastcount + 1
   else:
    pilink("510+")
+   lastcount = lastcount + 1
   cur.execute("SELECT timestamp FROM d2data ORDER BY timestamp DESC LIMIT 1")
   tstamp = cur.fetchone()
   if tstamp is not None:
    lastd2 = tstamp
    if (now - tstamp[0]) < datetime.timedelta(0,180):
     pilink("521+")
+    pilink("20green+")
    else:
     pilink("520+")
+    lastcount = lastcount + 1
   else:
    pilink("520+")
+   lastcount = lastcount + 1
   cur.execute("SELECT timestamp FROM d3data ORDER BY timestamp DESC LIMIT 1")
   tstamp = cur.fetchone()
   if tstamp is not None:
    lastd3 = tstamp
    if (now - tstamp[0]) < datetime.timedelta(0,180):
     pilink("531+")
+    pilink("20green+")
    else:
     pilink("530+")
+    lastcount = lastcount + 1
   else:
    pilink("530+")
+   lastcount = lastcount + 1
   cur.execute("SELECT timestamp FROM d4data ORDER BY timestamp DESC LIMIT 1")
   tstamp = cur.fetchone()
   if tstamp is not None:
    lastd4 = tstamp
    if (now - tstamp[0]) < datetime.timedelta(0,180):
     pilink("541+")
+    pilink("20green+")
    else:
     pilink("540+")
+    lastcount = lastcount + 1
   else:
    pilink("540+")
+   lastcount = lastcount + 1
   if os.path.isfile(pidfile):
    pidf = open(pidfile, "r")
    pid = pidf.read()
    pidf.close()
    if not os.path.isdir("/proc/"+str(pid)):
-    pilink("22+")
+    pilink("21red+")
    else:
-    pilink("23+")
+    if (lastcount == 4):
+     pilink("21green+")
+    else: 
+     pilink("20green+")
   else:
-   pilink("22+") 
+   pilink("21red+") 
   mylist = [lastd1, lastd2, lastd3, lastd4]
   latest = max(mylist)
   try:
@@ -207,7 +245,9 @@ def main_program():
    return last
   except:
    print "No Data."
- 
+
+ global ispushed
+ ispushed = False 
  try: 
   while True:
    if args.d == False:
@@ -215,14 +255,17 @@ def main_program():
    checklast()
    if args.d == False:
     print "LCD Sreen State: #"+str(lcdstate)
-   if (lcdstate == 1):
-    showip()
-   elif (lcdstate == 2):
-    showtime()
-   elif (lcdstate == 3):
-    showrss()
-   elif (lcdstate == 0):
-    showlast()
+   if ispushed == False:
+    if (lcdstate == 1):
+     activestations()
+    elif (lcdstate == 2):
+     showlast()
+    elif (lcdstate == 3):
+     showrss()
+    elif (lcdstate == 4):
+     showtime()
+    elif (lcdstate == 5):
+     showip()
    if args.d == False:
     end = time.time()
     extime = (end - start)

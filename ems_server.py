@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, os.path, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool, daemon, smbus, argparse
+import sys, os, os.path, signal, time, datetime, socket, SocketServer, fcntl, struct, MySQLdb, rrdtool, daemon, smbus, argparse, subprocess
 from config import Config
 
 pidfile = '/var/lock/ems_server'
@@ -48,7 +48,7 @@ def main_program():
  
 # SIGINT Catch
  def signal_handler(signal, frame):
-  pilink("22+")
+  pilink("21red+")
   print "SIGNINT Exiting."
   cur.close()
   if db.open:
@@ -79,18 +79,32 @@ def main_program():
          struct.pack('256s', ifname[:15])
      )[20:24])
 
- class MyTCPHandler(SocketServer.BaseRequestHandler):
+ def chkhostapd():
+  if os.path.isfile("/var/run/hostapd.pid"):
+   hpidf = open("/var/run/hostapd.pid", "r")
+   hpid = hpidf.read()
+   hpidf.close()
+   hpid = hpid.strip('\n')
+   output = subprocess.Popen(["ps", "--no-headers", "-p", hpid], stdout=subprocess.PIPE).communicate()[0]
+   if (len(output) != 0):
+    pilink("11green+")
+   else:  
+    pilink("11red+")
+  else:
+   pilink("11red+")
+   
+ class MyTCPHandler(SocketServer.BaseRequestHandler):  # TCP Server Data Receiver
      def handle(self):
          # self.request is the TCP socket connected to the client
          self.data = self.request.recv(1024).strip()
          now = datetime.datetime.now()
          sdata = [x for x in self.data.split("#")]
-         print sdata;
-         pilink("499+")
+         #print sdata;
+         #pilink("499+")
          print "Received from "+format(self.client_address[0])+" (Device "+sdata[0]+"): "+self.data
          if sdata[0] == '1':
           try:
-           cur.execute("""INSERT INTO EMS.d1data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
+           cur.execute("""INSERT INTO EMS.d1data(timestamp,temp,humidity,dewpoint,lux,ir,uv,vis) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6],sdata[7]))
            db.commit()
           #except:
           except MySQLdb.Error, e:
@@ -107,21 +121,21 @@ def main_program():
 
          elif sdata[0] == '2':
           try:
-           cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
+           cur.execute("""INSERT INTO EMS.d2data(timestamp,temp,humidity,dewpoint,lux,ir,uv,vis) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6],sdata[7]))
            db.commit()
           except:
            print "Database Error."
            db.rollback()
          elif sdata[0] == '3':
           try:
-           cur.execute("""INSERT INTO EMS.d3data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
+           cur.execute("""INSERT INTO EMS.d3data(timestamp,temp,humidity,dewpoint,lux,ir,uv,vis) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6],sdata[7]))
            db.commit()
           except:
            print "Database Error."
            db.rollback()
          elif sdata[0] == '4':
           try:
-           cur.execute("""INSERT INTO EMS.d4data(timestamp,temp,humidity,dewpoint,vis,ir,uv) VALUES(%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6]))
+           cur.execute("""INSERT INTO EMS.d4data(timestamp,temp,humidity,dewpoint,lux,ir,uv,vis) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)""",(now,sdata[1],sdata[2],sdata[3],sdata[4],sdata[5],sdata[6],sdata[7]))
            db.commit()
           except:
            print "Database Error."
@@ -131,6 +145,7 @@ def main_program():
          self.request.sendall(self.data.upper())
 
  try:
+  pilink("21blue+")
   signal.signal(signal.SIGINT, signal_handler)
   if not os.path.isfile('/opt/rrddata/d1temp.rrd'):
    rrdtool.create(
@@ -148,15 +163,16 @@ def main_program():
   server_address=(ip,tcpport)
   # Create the server, binding to localhost on port 9999
   server = SocketServer.TCPServer((ip, tcpport), MyTCPHandler)
-  pilink("100EMS Server "+version+"+") 
-  pilink("101"+ip+"+")
+  pilink("300EMS Server "+version+"+")
   time.sleep(10)
+  chkhostapd()
   print "Starting up on "+eth+" "+ip+":"+str(tcpport)
-  pilink("23+")
+  pilink("21green+")
+  pilink("301"+ip+"+")
   server.serve_forever()
  except KeyboardInterrupt:
   print('CTRL-C Exiting.')
-  pilink("22+")
+  pilink("21red+")
   cur.close()
   if db.open:
    db.close()
@@ -167,7 +183,7 @@ def main_program():
   raise
  finally:
   print('Exiting.')
-  pilink("22+")
+  pilink("21red+")
   cur.close()
   if db.open:
    db.close()

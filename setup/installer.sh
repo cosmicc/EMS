@@ -2,11 +2,12 @@ cd /opt
 git clone https://github.com/cosmicc/EMS.git
 read -n 1 -s -p "Press any key to continue"
 timedatectl set-timezone America/New_York
+add-apt-repository ppa:chris-lea/node.js
 apt update
 read -n 1 -s -p "Press any key to continue"
 apt upgrade
 read -n 1 -s -p "Press any key to continue"
-apt install python python-pip mysql-server python-dev libmysqlclient-dev mysql-client ntp ntpdate rrdtool python-rrdtool lighttpd i2c-tools python-smbus iw build-essential linux-headers-generic dkms -f
+apt install python python-pip mysql-server python-dev libmysqlclient-dev mysql-client ntp ntpdate rrdtool python-rrdtool lighttpd i2c-tools python-smbus iw build-essential linux-headers-generic dkms python-software-properties python g++ make nodejs libusb-1.0-0-dev npm -f
 read -n 1 -s -p "Press any key to continue"
 pip install --upgrade pip
 read -n 1 -s -p "Press any key to continue"
